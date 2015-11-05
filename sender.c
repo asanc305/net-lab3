@@ -12,25 +12,29 @@
 const int window_size = 100 ;
 const int packet_size = 1024 ;
 
-void syserr(char* msg) { perror(msg); exit(-1); }
+void makeHeader(char * header, int seq, off_t size)
+{
+  sprintf( header, "%i!E!%jd", seq, size ) ;  
+}
 
 int main(int argc, char* argv[])
 {
-  int sockfd, portno, n, file, base, next, j, i, resend ;
+  int sockfd, portno, n, file, base, next, j, i, temp ;
   off_t bytes_sent, fsize ;
   struct hostent* server;
   struct sockaddr_in serv_addr;
   struct sockaddr* to ;
   socklen_t addrlen;
-  int window [window_size] ;
   char packets [window_size] [packet_size] ;
   char buffer[1056] ;
+  char smallbuffer[64] ;
   struct stat f_stat ;
   fd_set readset ;
   struct timeval tv ;
   const char del[2] = " " ;
   char * token ;
-  char seqnumber [10] ;
+  char seqnumber [11] ;
+  char header [20] ;
   
 
   if(argc != 4) {
@@ -47,7 +51,7 @@ int main(int argc, char* argv[])
   portno = atoi(argv[2]);
   
   sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  if(sockfd < 0) syserr("can't open socket");
+  if(sockfd < 0) return -1 ;
   printf("create socket...\n");
 
   memset(&serv_addr, 0, sizeof(serv_addr));
@@ -60,7 +64,6 @@ int main(int argc, char* argv[])
   //connected sendto recvfrom
   
   //initialize array
-  for(i = 0; i<= window_size -1; i++) window[i] = 0 ;
   for(i = 0; i<= window_size -1; i++) packets[i][0] = '\0' ;
   
   file = open(argv[3], O_RDONLY) ;
@@ -72,24 +75,30 @@ int main(int argc, char* argv[])
   j = 0 ;
   base = 0 ;
   next = 0 ;
+  temp = 0 ;
   
   while( fsize > bytes_sent )
   {
-    while( next < base + window_size - 1 )
+    while( next < base + window_size && temp < fsize )
     {
-      printf("ASSEMBLING PACKET # %i !!!\n", next) ;
+      memset(buffer, '\0', sizeof(buffer)) ;
+      
       n = read( file, packets[j], packet_size ) ;
       packets[j][n] = '\0' ;
-      sprintf(buffer, "%i %jd %s", next, fsize, packets[j]) ; 
+      
+      sprintf(buffer, "%010d%010jd%s", next, fsize, packets[j]) ; 
 
-      n = sendto(sockfd, buffer, sizeof(buffer), 0, to, addrlen);
-      //printf("ASSEMBLING PACKET # %i !!!\n", next) ;
+      //printf("Read %i bytes\n", n) ;
+      i = sendto(sockfd, buffer, sizeof(buffer), 0, to, addrlen);
+      //printf("Sent %i bytes\n", i) ;
       next++ ;
       j++ ;
-      
+      temp += n ;
+      //return 1 ;
     }
-    
-    printf("HEERRRR\n") ;
+
+    if (temp == fsize) next-- ;
+    /*
     do
     {
       FD_ZERO(&readset) ;
@@ -102,40 +111,40 @@ int main(int argc, char* argv[])
 
 	    if (n > 0) 
 	    {
-	      n = recvfrom(sockfd, buffer, 64, 0, to, &addrlen) ; 
-	      buffer[n] = '\0' ;
-	      token = strtok(buffer, del) ;
+	      n = recvfrom(sockfd, smallbuffer, sizeof(smallbuffer), 0, to, &addrlen) ; 
+	      smallbuffer[n] = '\0' ;
 	      
-	      if ( strcmp( token, "ACK" ) == 0 )
-	      {
-	        sprintf( seqnumber, "%i", base ) ;
-	        token = strtok(NULL, del) ;
-	        if ( strcmp(token, seqnumber ) == 0)
-	        {
-	          printf("ACK RECEIVED FOR SEQ %s\n", seqnumber) ;
-	          if ( (base % window_size) == 0 ) j = (j + 1) % window_size ;
-	          base++ ;
-	          bytes_sent += 1024 ;
-	        }
+	      memset(seqnumber, '\0', sizeof(seqnumber)) ;
+	      strncpy( seqnumber, smallbuffer+3, 10 ) ;
+	      
+        if ( base == atoi(seqnumber) )
+        {
+          printf("ACK RECEIVED FOR SEQ %i base: %i next: %i\n", atoi(seqnumber), base, next) ;
+          if ( (base % window_size) == 0 ) j = 0 ;
+          base++ ;
+          bytes_sent += 1024 ;
 	      }
 	    }
-    } while( n >= 1 ) ;
+    } while( n >= 1 ) ;*/
     
-    printf("GOT HERE BASE: %i NEXT: %i\n", base, next) ;
+    
+    /*
     if ( base != next )
     {
       n = base ;
       j = n % window_size ;
+      printf("Resending base:%i next:%i j:%i\n", base, next, j ) ;
       while (n <= next)
       {
-        sprintf(buffer, "%i %jd %s", next, fsize, packets[j]) ; 
+        sprintf(buffer, "%010d%010jd%s", n, fsize, packets[j]) ;  
 
         sendto(sockfd, buffer, sizeof(buffer), 0, to, addrlen);
       
         n++ ;
         j++ ;
       }
-    }
+      j = 0;
+    }*/
   } 
   
   close(sockfd);

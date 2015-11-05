@@ -6,23 +6,24 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 
 int main(int argc, char *argv[])
 {
-  int sockfd, portno, n, seq;
+  int sockfd, portno, n, seq, file;
   struct sockaddr_in serv_addr, clt_addr; 
   socklen_t addrlen;
-  char rbuffer[1024] ;
-  char sbuffer[32];
+  char rbuffer[1056] ;
+  char sbuffer[64];
   struct sockaddr* address ;
-  char *token ;
-  const char del[2] = " " ;
-  char seqnumber [10] ;
-  
+  char seqnumber [11] ;
+  char filesize [11] ;
+  char data [1024] ;
+  mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH ;  
 
-  if(argc != 2) 
+  if(argc != 3) 
   { 
-    printf("Usage: %s <port>\n", argv[0]);
+    printf("Usage: %s <port> <filename>\n", argv[0]);
     return 1;
   } 
   portno = atoi(argv[1]);
@@ -43,18 +44,31 @@ int main(int argc, char *argv[])
   address = (struct sockaddr*) &clt_addr ;
 
   seq = 0 ;
+  file = open( argv[2], O_WRONLY | O_CREAT | O_EXCL, mode ) ;
   for(;;)
   {
     //printf("wait on port %d...\n", portno);
-    n = recvfrom(sockfd, rbuffer, 1024, 0, address, &addrlen); 
+    memset(seqnumber, '\0', sizeof(seqnumber)) ;
+    memset(filesize, '\0', sizeof(filesize)) ;
+    memset(data, '\0', sizeof(data)) ;
     
-    sprintf( seqnumber, "%i", seq ) ;
-    token = strtok(rbuffer, del) ;    
-    if ( strcmp(token, seqnumber) == 0 )
+    n = recvfrom(sockfd, rbuffer, 1056, 0, address, &addrlen); 
+    rbuffer[n] = '\0' ;
+    
+    strncpy( seqnumber, rbuffer, 10 ) ;
+    strncpy( filesize, rbuffer + 10, 10 ) ;
+    
+    //printf("Filesize %s\n", filesize) ;
+    
+    if ( atoi( seqnumber) == seq )
 	  {
-	    printf("ACK SENT!!!!!\n") ;
-	    sprintf( sbuffer, "ACK %i", seq ) ;
-	    n = sendto(sockfd, sbuffer, sizeof(sbuffer), 0, address, addrlen);
+	    printf("ACK %i SENT\n", atoi(seqnumber)) ;
+	    sprintf( sbuffer, "ACK%s", seqnumber ) ;
+	    n = sendto(sockfd, sbuffer, sizeof(sbuffer), 0, address, addrlen) ;
+	    
+	    strcpy( data, rbuffer + 20 ) ;
+	    write( file, data, strlen(data) );
+	   
 	    seq ++ ;
 	  }
 
