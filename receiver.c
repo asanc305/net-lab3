@@ -10,7 +10,7 @@
 
 int main(int argc, char *argv[])
 {
-  int sockfd, portno, n, seq, file;
+  int sockfd, portno, n, seq, file, fsize, recvd;
   struct sockaddr_in serv_addr, clt_addr; 
   socklen_t addrlen;
   char rbuffer[1056] ;
@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 
   seq = 0 ;
   file = open( argv[2], O_WRONLY | O_CREAT | O_EXCL, mode ) ;
-  for(;;)
+  do
   {
     //printf("wait on port %d...\n", portno);
     memset(seqnumber, '\0', sizeof(seqnumber)) ;
@@ -57,7 +57,8 @@ int main(int argc, char *argv[])
     
     strncpy( seqnumber, rbuffer, 10 ) ;
     strncpy( filesize, rbuffer + 10, 10 ) ;
-    
+    fsize = atoi(filesize) ;
+
     //printf("Filesize %s\n", filesize) ;
     
     if ( atoi( seqnumber) == seq )
@@ -68,11 +69,11 @@ int main(int argc, char *argv[])
 	    
 	    strcpy( data, rbuffer + 20 ) ;
 	    write( file, data, strlen(data) );
-	   
+	    recvd += strlen(data);
 	    seq ++ ;
 	  }
 
-  }
+  }while( recvd != fsize ) ;
 
   close(sockfd); 
   return 0;
