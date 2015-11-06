@@ -18,6 +18,7 @@ int main(int argc, char *argv[])
   struct sockaddr* address ;
   char seqnumber [11] ;
   char filesize [11] ;
+  char datasize [11] ;
   char data [1024] ;
   mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH ;  
 
@@ -42,15 +43,18 @@ int main(int argc, char *argv[])
   printf("bind socket to port %d...\n", portno);
   addrlen = sizeof(clt_addr); 
   address = (struct sockaddr*) &clt_addr ;
+  
+  memset(seqnumber, '\0', sizeof(seqnumber)) ;
+  memset(filesize, '\0', sizeof(filesize)) ;
+  memset(datasize, '\0', sizeof(datasize)) ;
+  memset(data, '\0', sizeof(data)) ;
 
   seq = 0 ;
+  recvd = 0 ;
   file = open( argv[2], O_WRONLY | O_CREAT | O_EXCL, mode ) ;
   do
   {
-    //printf("wait on port %d...\n", portno);
-    memset(seqnumber, '\0', sizeof(seqnumber)) ;
-    memset(filesize, '\0', sizeof(filesize)) ;
-    memset(data, '\0', sizeof(data)) ;
+    
     
     n = recvfrom(sockfd, rbuffer, 1056, 0, address, &addrlen); 
     rbuffer[n] = '\0' ;
@@ -63,15 +67,18 @@ int main(int argc, char *argv[])
     
     if ( atoi( seqnumber) == seq )
 	  {
-	    printf("ACK %i SENT\n", atoi(seqnumber)) ;
+	    printf("ACK %i SENT\n", atoi (seqnumber)) ;
 	    sprintf( sbuffer, "ACK%s", seqnumber ) ;
 	    n = sendto(sockfd, sbuffer, sizeof(sbuffer), 0, address, addrlen) ;
 	    
-	    strcpy( data, rbuffer + 20 ) ;
-	    write( file, data, strlen(data) );
-	    recvd += strlen(data);
+	    strncpy( datasize, rbuffer + 20, 10 ) ;
+	    strcpy( data, rbuffer + 30 ) ;
+	    write( file, data, atoi(datasize) );
+	    recvd += atoi(datasize) ;
+	    //recvd += n;
 	    seq ++ ;
 	  }
+	  else printf("RECVD %i\n", atoi(seqnumber));
 
   }while( recvd != fsize ) ;
 

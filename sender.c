@@ -24,13 +24,13 @@ off_t size(const char *filename) {
 int main(int argc, char* argv[])
 {
   int sockfd, portno, n, base, next, j, i ;
-  size_t x ;
+  size_t datasize ;
   off_t bytes_sent, fsize, temp ;
   struct hostent* server;
   struct sockaddr_in serv_addr;
   struct sockaddr* to ;
   socklen_t addrlen;
-  char packets [window_size] [packet_size] ;
+  char packets [window_size] [1056] ;
   char buffer[1056] ;
   char smallbuffer[64] ;
   struct stat f_stat ;
@@ -72,7 +72,7 @@ int main(int argc, char* argv[])
   //initialize array
   for(i = 0; i<= window_size -1; i++) memset(packets[i], '\0', packet_size) ;
   
-  file = fopen(argv[3], "rb") ;
+  file = fopen(argv[3], "r") ;
   if ( file == NULL) printf("error\n") ;
 
   fsize = size(argv[3]) ;
@@ -89,22 +89,21 @@ int main(int argc, char* argv[])
     {
       memset(buffer, '\0', sizeof(buffer)) ;
       
-      x = fread( packets[j], 1024, 1, file ) ;
-      printf("Read %zu bytes\n", x) ;
-      packets[j][n] = '\0' ;
-      printf("Size of packet: %zu\n", strlen(packets[j]) );
+      datasize = fread( buffer, 1, 1024, file ) ;
+      //printf("Read %zu bytes\n", x) ;
+      buffer[datasize] = '\0' ;
+      //printf("Size of packet: %zu\n", strlen(packets[j]) );
       
-      sprintf(buffer, "%010d%010jd%s", next, fsize, packets[j]) ; 
+      sprintf(packets[j], "%010d%010jd%010jd%s", next, fsize, datasize, buffer) ; 
       
-      i = sendto(sockfd, buffer, sizeof(buffer), 0, to, addrlen);
+      i = sendto(sockfd, packets[j], sizeof(buffer), 0, to, addrlen);
       //printf("Sent %i bytes\n", i) ;
-      next++ ;
-      j++ ;
-      temp += x ;
+      j = (j + 1) % window_size ;
+      
+      if (temp != fsize) next++ ;
+      temp += datasize ;
       //return -1 ;
     }
-
-    if (temp == fsize) next-- ;
     
     do
     {
@@ -127,7 +126,7 @@ int main(int argc, char* argv[])
         if ( base == atoi(seqnumber) )
         {
           //printf("ACK RECEIVED FOR SEQ %i base: %i next: %i\n", atoi(seqnumber), base, next) ;
-          if ( (base % window_size) == 0 ) j = 0 ;
+          //if ( (base % window_size) == 0 ) j = 0 ;
           base++ ;
           bytes_sent += 1024 ;
 	      }
@@ -135,23 +134,19 @@ int main(int argc, char* argv[])
 	    }
     } while( n >= 1 ) ;
     
-    
-    
-    if ( base != next )
+    if ( base != next  )
     {
       n = base ;
-      j = n % window_size ;
-      //printf("Resending base:%i next:%i j:%i\n", base, next, j ) ;
-      while (n <= next)
-      {
-        sprintf(buffer, "%010d%010jd%s", n, fsize, packets[j]) ;  
+      i = n % window_size ;
 
-        sendto(sockfd, buffer, sizeof(buffer), 0, to, addrlen);
-      
+      while (n < next)
+      {
+        sendto(sockfd,packets[i], sizeof(buffer), 0, to, addrlen);
+        //printf("Resent %i\n", n) ;
         n++ ;
-        j = (j + 1) % window_size ;
+        i = (i + 1) % window_size ;
       }
-      j = 0;
+      
     }
   } 
   
