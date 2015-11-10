@@ -74,9 +74,8 @@ int main(int argc, char *argv[])
 	    strcpy( data, rbuffer + 30 ) ;
 	    write( file, data, atoi(datasize) );
 	    recvd += atoi(datasize) ;
-	    if (recvd == fsize)
-	      retrans == 1 ;
-	    //recvd += n;
+	    if (recvd == fsize) retrans = 1 ;
+
 	    seq ++ ;
 	  }
 	  else
@@ -86,19 +85,23 @@ int main(int argc, char *argv[])
     }
     
     printf("\rProgress %.0f%%", ((double)recvd / (double)fsize) *100 ) ;
-    fflush(stdout);
-    if ( retrans )
+    fflush(stdout) ;
+    
+    if ( retrans == 1 )
     {
       FD_ZERO(&readset) ;
 	    FD_SET(sockfd, &readset) ;
-	  
+
 	    tv.tv_sec = 60 ;
 	    tv.tv_usec = 0 ;
 	  
 	    n = select(sockfd+1, &readset, NULL, NULL, &tv) ;
 	    
 	    if (n==0)
+	    {
 	      retrans = 0 ;
+	      printf("\n") ;
+	    }
     }
     
   }while( recvd != fsize || retrans ) ;

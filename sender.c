@@ -90,19 +90,19 @@ int main(int argc, char* argv[])
       memset(buffer, '\0', sizeof(buffer)) ;
       
       datasize = fread( buffer, 1, 1024, file ) ;
-      //printf("Read %zu bytes\n", x) ;
+
       buffer[datasize] = '\0' ;
-      //printf("Size of packet: %zu\n", strlen(packets[j]) );
+
       
       sprintf(packets[j], "%010d%010jd%010jd%s", next, fsize, datasize, buffer) ; 
       
       i = sendto(sockfd, packets[j], sizeof(buffer), 0, to, addrlen);
-      //printf("Sent %i bytes\n", i) ;
+
       j = (j + 1) % window_size ;
       
       if (temp != fsize) next++ ;
       bytes_sent += datasize ;
-      //return -1 ;
+
     }
     
     do
@@ -123,8 +123,7 @@ int main(int argc, char* argv[])
 	      memset(seqnumber, '\0', sizeof(seqnumber)) ;
 	      strncpy( seqnumber, smallbuffer+3, 10 ) ;
 	      
-        if ( base <= atoi(seqnumber) ) base = atoi(seqnumber) + 1 ; 
-	      }
+        if ( base <= atoi(seqnumber) ) base = atoi(seqnumber) + 1 ;
 
 	    }
     } while( n >= 1 ) ;
@@ -137,13 +136,11 @@ int main(int argc, char* argv[])
       while (n < next)
       {
         sendto(sockfd,packets[i], sizeof(buffer), 0, to, addrlen);
-        //printf("Resent %i\n", n) ;
         n++ ;
         i = (i + 1) % window_size ;
       }
     }
     
-    //printf("END OF LOOP\n") ;
   } while( fsize > bytes_sent || base < next );
   
   close(sockfd);
