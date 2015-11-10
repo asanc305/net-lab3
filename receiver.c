@@ -10,7 +10,7 @@
 
 int main(int argc, char *argv[])
 {
-  int sockfd, portno, n, seq, file, fsize, recvd;
+  int sockfd, portno, n, seq, file, fsize, recvd, retrans ;
   struct sockaddr_in serv_addr, clt_addr; 
   socklen_t addrlen;
   char rbuffer[1056] ;
@@ -20,6 +20,8 @@ int main(int argc, char *argv[])
   char filesize [11] ;
   char datasize [11] ;
   char data [1024] ;
+  fd_set readset ;
+  struct timeval tv ;
   mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH ;  
 
   if(argc != 3) 
@@ -49,25 +51,22 @@ int main(int argc, char *argv[])
   memset(datasize, '\0', sizeof(datasize)) ;
   memset(data, '\0', sizeof(data)) ;
 
+  retrans = 0 ;
   seq = 0 ;
   recvd = 0 ;
   file = open( argv[2], O_WRONLY | O_CREAT | O_EXCL, mode ) ;
+  
   do
   {
-    
-    
     n = recvfrom(sockfd, rbuffer, 1056, 0, address, &addrlen); 
     rbuffer[n] = '\0' ;
     
     strncpy( seqnumber, rbuffer, 10 ) ;
     strncpy( filesize, rbuffer + 10, 10 ) ;
     fsize = atoi(filesize) ;
-
-    //printf("Filesize %s\n", filesize) ;
     
     if ( atoi( seqnumber) == seq )
 	  {
-	    printf("ACK %i SENT\n", atoi (seqnumber)) ;
 	    sprintf( sbuffer, "ACK%s", seqnumber ) ;
 	    n = sendto(sockfd, sbuffer, sizeof(sbuffer), 0, address, addrlen) ;
 	    
@@ -75,12 +74,34 @@ int main(int argc, char *argv[])
 	    strcpy( data, rbuffer + 30 ) ;
 	    write( file, data, atoi(datasize) );
 	    recvd += atoi(datasize) ;
+	    if (recvd == fsize)
+	      retrans == 1 ;
 	    //recvd += n;
 	    seq ++ ;
 	  }
-	  else printf("RECVD %i\n", atoi(seqnumber));
-
-  }while( recvd != fsize ) ;
+	  else
+	  {
+	    sprintf( sbuffer, "ACK%010d", seq-1 );
+	    sendto(sockfd, sbuffer, sizeof(sbuffer), 0, address, addrlen) ;
+    }
+    
+    printf("\rProgress %.0f%%", ((double)recvd / (double)fsize) *100 ) ;
+    fflush(stdout);
+    if ( retrans )
+    {
+      FD_ZERO(&readset) ;
+	    FD_SET(sockfd, &readset) ;
+	  
+	    tv.tv_sec = 60 ;
+	    tv.tv_usec = 0 ;
+	  
+	    n = select(sockfd+1, &readset, NULL, NULL, &tv) ;
+	    
+	    if (n==0)
+	      retrans = 0 ;
+    }
+    
+  }while( recvd != fsize || retrans ) ;
 
   close(sockfd); 
   return 0;

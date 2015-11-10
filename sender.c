@@ -83,9 +83,9 @@ int main(int argc, char* argv[])
   next = 0 ;
   temp = 0 ;
   
-  while( fsize > bytes_sent )
+  do
   {
-    while( next < base + window_size && temp < fsize )
+    while( next < base + window_size && fsize > bytes_sent)
     {
       memset(buffer, '\0', sizeof(buffer)) ;
       
@@ -101,7 +101,7 @@ int main(int argc, char* argv[])
       j = (j + 1) % window_size ;
       
       if (temp != fsize) next++ ;
-      temp += datasize ;
+      bytes_sent += datasize ;
       //return -1 ;
     }
     
@@ -123,14 +123,9 @@ int main(int argc, char* argv[])
 	      memset(seqnumber, '\0', sizeof(seqnumber)) ;
 	      strncpy( seqnumber, smallbuffer+3, 10 ) ;
 	      
-        if ( base == atoi(seqnumber) )
-        {
-          //printf("ACK RECEIVED FOR SEQ %i base: %i next: %i\n", atoi(seqnumber), base, next) ;
-          //if ( (base % window_size) == 0 ) j = 0 ;
-          base++ ;
-          bytes_sent += 1024 ;
+        if ( base <= atoi(seqnumber) ) base = atoi(seqnumber) + 1 ; 
 	      }
-        else printf("WRONG ACK RECEIVED\n") ;
+
 	    }
     } while( n >= 1 ) ;
     
@@ -146,9 +141,10 @@ int main(int argc, char* argv[])
         n++ ;
         i = (i + 1) % window_size ;
       }
-      
     }
-  } 
+    
+    //printf("END OF LOOP\n") ;
+  } while( fsize > bytes_sent || base < next );
   
   close(sockfd);
   return 0;
